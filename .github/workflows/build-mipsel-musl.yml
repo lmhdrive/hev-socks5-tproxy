@@ -37,10 +37,10 @@ jobs:
         with:
           submodules: true
 
-      - name: Compile static binary
+      - name: Compile binary (remove forced -static for link order fix)
         run: |
           export CROSS_COMPILE=mipsel-linux-musl-
-          make CFLAGS="-static -Os -ffunction-sections -fdata-sections" LDFLAGS="-static -Wl,--gc-sections"
+          make CFLAGS="-Os -ffunction-sections -fdata-sections" LDFLAGS="-Wl,--gc-sections"
           mipsel-linux-musl-strip hev-socks5-tproxy
           mv hev-socks5-tproxy hev-socks5-tproxy-mipsel-musl-openwrt2203
 
@@ -49,4 +49,3 @@ jobs:
         with:
           name: hev-socks5-tproxy-mipsel-musl-openwrt2203
           path: hev-socks5-tproxy-mipsel-musl-openwrt2203
-
