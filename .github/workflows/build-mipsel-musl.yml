@@ -16,16 +16,16 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /opt/cross
-          key: musl-cross-make-mipsel-softfloat-v2
+          key: musl-cross-make-mipsel-illinois-v3
 
-      - name: Build musl-cross-make (EU mirror)
+      - name: Build musl-cross-make (US university mirror)
         run: |
           set -e
           if [ ! -d "/opt/cross/bin" ]; then
             git clone --depth=1 https://github.com/richfelker/musl-cross-make.git
             cd musl-cross-make
-            # 替换为德国欧洲GNU镜像
-            sed -i 's|https://ftp.gnu.org/gnu|https://ftp.de.debian.org/gnu|g' Makefile
+            # 替换伊利诺伊大学镜像
+            sed -i 's|https://ftp.gnu.org/gnu|https://mirrors.illinois.edu/gnu|g' Makefile
             echo "TARGET=mipsel-linux-musl" > config.mak
             echo "OUTPUT=/opt/cross" >> config.mak
             echo "GCC_CONFIG += --with-float=soft" >> config.mak
@@ -39,7 +39,7 @@ jobs:
         with:
           submodules: true
 
-      - name: Compile (pure make, no extra compile flags)
+      - name: Compile (pure make, no extra flags)
         run: |
           export CROSS_COMPILE=mipsel-linux-musl-
           make
@@ -50,5 +50,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hev-socks5-tproxy-mipsel-musl-openwrt2203
-          path: hev-socks5-tproxy-mipsel-musl-openwrt2203
-
+          path: hev-socks5-tproxy-mipsel-musl-openwrt2
