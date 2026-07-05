@@ -27,7 +27,8 @@ jobs:
 
       - name: Checkout source
         uses: actions/checkout@v4
-
+        with:
+          submodules: true
       - name: Compile static binary
         run: |
           export CROSS_COMPILE=mipsel-linux-musl-
