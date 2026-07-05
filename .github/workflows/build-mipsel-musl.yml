@@ -1,4 +1,4 @@
-name: Build hev-socks5-tproxy mips32el-musl static
+name: Build hev-socks5-tproxy for OpenWrt 22.03 mipsel-musl
 on:
   workflow_dispatch:
 
@@ -6,32 +6,38 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Install minimal build tools
+        run: |
+          sudo apt update -qq
+          sudo apt install -y -qq make gcc g++ git bzip2 xz-utils
+
+      - name: Build musl-cross-make
+        run: |
+          git clone --depth=1 https://github.com/richfelker/musl-cross-make.git
+          cd musl-cross-make
+          echo 'TARGET = mipsel-linux-musl' > config.mak
+          echo 'OUTPUT = /opt/cross' >> config.mak
+          echo 'GCC_CONFIG += --with-float=soft' >> config.mak
+          make -j2
+          sudo make install
+
+      - name: Add cross compiler to PATH
+        run: |
+          echo "/opt/cross/bin" >> $GITHUB_PATH
+
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install build deps
+      - name: Compile static binary
         run: |
-          sudo apt update
-          sudo apt install -y make wget tar
-
-      - name: Fetch musl cross toolchain
-        run: |
-          wget --dns-timeout=20 --connect-timeout=30 --read-timeout=60 --tries=3 -q https://github.com/richfelker/musl-cross-make/releases/download/20211104/mipsel-linux-musl-cross.tgz
-          tar -xf mipsel-linux-musl-cross.tgz
-          echo "$PWD/mipsel-linux-musl-cross/bin" >> $GITHUB_PATH
-
-      - name: Compile static musl
-        env:
-          CC: mipsel-linux-musl-gcc
-          CFLAGS: -static -Os -s
-        run: |
+          export CROSS_COMPILE=mipsel-linux-musl-
           make clean
-          make
-          mv hev-socks5-tproxy hev-socks5-tproxy-linux-mips32el-musl
+          make CFLAGS="-static -Os -ffunction-sections -fdata-sections" LDFLAGS="-static -Wl,--gc-sections"
+          mipsel-linux-musl-strip hev-socks5-tproxy
+          mv hev-socks5-tproxy hev-socks5-tproxy-mipsel-musl-openwrt2203
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hev-socks5-tproxy-mips32el-musl
-          path: hev-socks5-tproxy-linux-mips32el-musl
-
+          name: hev-socks5-tproxy-mipsel-musl-openwrt2203
+          path: hev-socks5-tproxy-mipsel-musl-openwrt2203
