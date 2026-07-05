@@ -10,20 +10,22 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt update -qq
-          sudo apt install -y -qq git make
+          sudo apt install -y -qq git make sed
 
       - name: Cache cross compiler
         uses: actions/cache@v3
         with:
           path: /opt/cross
-          key: musl-cross-make-mipsel-softfloat-v1
+          key: musl-cross-make-mipsel-softfloat-v2
 
-      - name: Build musl-cross-make
+      - name: Build musl-cross-make (EU mirror)
         run: |
           set -e
           if [ ! -d "/opt/cross/bin" ]; then
             git clone --depth=1 https://github.com/richfelker/musl-cross-make.git
             cd musl-cross-make
+            # 替换为德国欧洲GNU镜像
+            sed -i 's|https://ftp.gnu.org/gnu|https://ftp.de.debian.org/gnu|g' Makefile
             echo "TARGET=mipsel-linux-musl" > config.mak
             echo "OUTPUT=/opt/cross" >> config.mak
             echo "GCC_CONFIG += --with-float=soft" >> config.mak
@@ -37,7 +39,7 @@ jobs:
         with:
           submodules: true
 
-      - name: Compile (only set CROSS_COMPILE, no extra flags)
+      - name: Compile (pure make, no extra compile flags)
         run: |
           export CROSS_COMPILE=mipsel-linux-musl-
           make
@@ -49,3 +51,4 @@ jobs:
         with:
           name: hev-socks5-tproxy-mipsel-musl-openwrt2203
           path: hev-socks5-tproxy-mipsel-musl-openwrt2203
+
