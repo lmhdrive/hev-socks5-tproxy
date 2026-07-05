@@ -1,4 +1,5 @@
 name: Build hev-socks5-tproxy for OpenWrt 22.03 mipsel-musl
+
 on:
   workflow_dispatch:
 
@@ -9,26 +10,33 @@ jobs:
       - name: Install minimal build tools
         run: |
           sudo apt update -qq
-          sudo apt install -y -qq make gcc g++ git bzip2 xz-utils
+          sudo apt install -y -qq git bzip2 xz-utils wget
 
-      - name: Build musl-cross-make
+      # 缓存预编译工具链，下次不用重新下载
+      - name: Cache cross compiler
+        uses: actions/cache@v3
+        with:
+          path: /opt/cross
+          key: prebuilt-mipsel-linux-musl
+
+      # 直接下载现成交叉工具链，不再现场编译GCC
+      - name: Fetch prebuilt mipsel-linux-musl toolchain
         run: |
-          git clone --depth=1 https://github.com/richfelker/musl-cross-make.git
-          cd musl-cross-make
-          echo 'TARGET = mipsel-linux-musl' > config.mak
-          echo 'OUTPUT = /opt/cross' >> config.mak
-          echo 'GCC_CONFIG += --with-float=soft' >> config.mak
-          make -j2
-          sudo make install
+          if [ ! -d "/opt/cross/mipsel-linux-musl-cross/bin" ]; then
+            sudo mkdir -p /opt/cross
+            cd /opt/cross
+            sudo wget https://musl.cc/mipsel-linux-musl-cross.tgz
+            sudo tar -zxf mipsel-linux-musl-cross.tgz -C /opt/cross/
+          fi
+          echo "/opt/cross/mipsel-linux-musl-cross/bin" >> $GITHUB_PATH
 
-      - name: Add cross compiler to PATH
-        run: |
-          echo "/opt/cross/bin" >> $GITHUB_PATH
-
+      # 拉取源码+子模块
       - name: Checkout source
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      # 编译静态程序
       - name: Compile static binary
         run: |
           export CROSS_COMPILE=mipsel-linux-musl-
@@ -36,6 +44,7 @@ jobs:
           mipsel-linux-musl-strip hev-socks5-tproxy
           mv hev-socks5-tproxy hev-socks5-tproxy-mipsel-musl-openwrt2203
 
+      # 上传产物
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
