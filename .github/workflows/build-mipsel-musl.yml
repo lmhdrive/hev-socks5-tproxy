@@ -1,0 +1,36 @@
+name: Build hev-socks5-tproxy mips32el-musl static
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt update
+          sudo apt install -y make wget tar
+
+      - name: Download mipsel-linux-musl cross compiler
+        run: |
+          wget https://github.com/richfelker/musl-cross-make/releases/download/20211104/mipsel-linux-musl-cross.tgz
+          tar -xf mipsel-linux-musl-cross.tgz
+          echo "$PWD/mipsel-linux-musl-cross/bin" >> $GITHUB_PATH
+
+      - name: Compile static musl binary
+        env:
+          CC: mipsel-linux-musl-gcc
+          CFLAGS: -static -Os -s
+        run: |
+          make clean
+          make
+          mv hev-socks5-tproxy hev-socks5-tproxy-linux-mips32el-musl
+
+      - name: Upload compiled binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: hev-socks5-tproxy-mips32el-musl
+          path: hev-socks5-tproxy-linux-mips32el-musl
