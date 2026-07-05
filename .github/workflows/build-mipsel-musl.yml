@@ -31,7 +31,6 @@ jobs:
       - name: Compile static binary
         run: |
           export CROSS_COMPILE=mipsel-linux-musl-
-          make clean
           make CFLAGS="-static -Os -ffunction-sections -fdata-sections" LDFLAGS="-static -Wl,--gc-sections"
           mipsel-linux-musl-strip hev-socks5-tproxy
           mv hev-socks5-tproxy hev-socks5-tproxy-mipsel-musl-openwrt2203
