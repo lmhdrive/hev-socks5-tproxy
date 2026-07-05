@@ -7,10 +7,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Install minimal build tools
+      - name: Install build tools
         run: |
           sudo apt update -qq
-          sudo apt install -y -qq gcc g++ git bzip2 xz-utils make
+          sudo apt install -y -qq git make
 
       - name: Cache cross compiler
         uses: actions/cache@v3
@@ -32,17 +32,17 @@ jobs:
           fi
           echo "/opt/cross/bin" >> $GITHUB_PATH
 
-      - name: Checkout source
+      - name: Checkout source with submodules
         uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Compile binary (remove forced -static for link order fix)
+      - name: Compile (only set CROSS_COMPILE, no extra flags)
         run: |
           export CROSS_COMPILE=mipsel-linux-musl-
-          make CFLAGS="-Os -ffunction-sections -fdata-sections" LDFLAGS="-Wl,--gc-sections"
-          mipsel-linux-musl-strip hev-socks5-tproxy
-          mv hev-socks5-tproxy hev-socks5-tproxy-mipsel-musl-openwrt2203
+          make
+          mipsel-linux-musl-strip bin/hev-socks5-tproxy
+          cp bin/hev-socks5-tproxy ./hev-socks5-tproxy-mipsel-musl-openwrt2203
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
