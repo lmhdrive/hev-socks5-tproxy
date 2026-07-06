@@ -7,59 +7,52 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Set up job
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
       - name: Install build tools
         run: |
           sudo apt update -qq
-          sudo apt install -y -qq git make sed
+          sudo apt install -y make git sed wget
 
       - name: Cache cross compiler
         uses: actions/cache@v3
         with:
           path: /opt/cross
-          key: musl-cross-make-mipsel-illinois-v3
+          key: musl-cross-make-mipsel
 
-      - name: Build musl-cross-make (fix bad latigo mirror)
+      - name: Build musl-cross-make
         run: |
           set -e
           if [ ! -d "/opt/cross/bin" ]; then
             git clone --depth=1 https://github.com/richfelker/musl-cross-make.git
             cd musl-cross-make
-            # 替换主镜像
             sed -i 's|https://ftp.gnu.org/gnu|https://mirrors.illinois.edu/gnu|g' Makefile
-            # 删除失效的 latigo.net 镜像
             sed -i '/mirror.latigo.net/d' Makefile
-            # wget增加超时重试
             sed -i 's/wget /wget --timeout=30 --tries=2 /g' Makefile
-
             echo "TARGET=mipsel-linux-musl" > config.mak
             echo "OUTPUT=/opt/cross" >> config.mak
-            echo "GCC_CONFIG += --with-float=soft" >> config.mak
-
             make -j2
             sudo make install
           fi
           echo "/opt/cross/bin" >> $GITHUB_PATH
 
-      - name: Checkout source with submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Compile (static non-PIE fix strip)
+      - name: Compile hev-socks5-tproxy
         env:
           CROSS_COMPILE: mipsel-linux-musl-
-          CFLAGS: -static -no-pie -O2
-          LDFLAGS: -static -no-pie
+          CFLAGS: -static -no-pie
         run: |
           set -e
           make clean
-          make pure
+          make
           file bin/hev-socks5-tproxy
           mipsel-linux-musl-strip bin/hev-socks5-tproxy || true
-          cp bin/hev-socks5-tproxy ./hev-socks5-tproxy-mipsel-musl-openwrt2203
+          cp bin/hev-socks5-tproxy ./hev-socks5-tproxy-mipsel-musl-openwrt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hev-socks5-tproxy-mipsel-musl-openwrt2203
-          path: hev-socks5-tproxy-mipsel-musl-openwrt2203
+          name: hev-socks5-tproxy-mipsel
+          path: hev-socks5-tproxy-mipsel-musl-openwrt
