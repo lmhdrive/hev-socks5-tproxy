@@ -18,17 +18,24 @@ jobs:
           path: /opt/cross
           key: musl-cross-make-mipsel-illinois-v3
 
-      - name: Build musl-cross-make (original flow)
+      - name: Build musl-cross-make (fix bad latigo mirror)
         run: |
           set -e
           if [ ! -d "/opt/cross/bin" ]; then
             git clone --depth=1 https://github.com/richfelker/musl-cross-make.git
             cd musl-cross-make
+            # 替换主镜像
             sed -i 's|https://ftp.gnu.org/gnu|https://mirrors.illinois.edu/gnu|g' Makefile
+            # 删除失效的 latigo.net 镜像
+            sed -i '/mirror.latigo.net/d' Makefile
+            # wget增加超时重试
+            sed -i 's/wget /wget --timeout=30 --tries=2 /g' Makefile
+
             echo "TARGET=mipsel-linux-musl" > config.mak
             echo "OUTPUT=/opt/cross" >> config.mak
             echo "GCC_CONFIG += --with-float=soft" >> config.mak
-            make -j$(nproc)
+
+            make -j2
             sudo make install
           fi
           echo "/opt/cross/bin" >> $GITHUB_PATH
@@ -38,7 +45,7 @@ jobs:
         with:
           submodules: true
 
-      - name: Compile (add -static -no-pie fix for strip)
+      - name: Compile (static non-PIE fix strip)
         env:
           CROSS_COMPILE: mipsel-linux-musl-
           CFLAGS: -static -no-pie -O2
@@ -47,9 +54,7 @@ jobs:
           set -e
           make clean
           make pure
-          # 先看一下ELF格式
           file bin/hev-socks5-tproxy
-          # 执行strip，万一还是识别不了也不阻断
           mipsel-linux-musl-strip bin/hev-socks5-tproxy || true
           cp bin/hev-socks5-tproxy ./hev-socks5-tproxy-mipsel-musl-openwrt2203
 
