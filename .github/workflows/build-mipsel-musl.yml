@@ -1,4 +1,4 @@
-name: Build hev-socks5-tproxy (mipsel-musl prebuilt toolchain)
+name: Build hev-socks5-tproxy mipsel-musl (final stable)
 
 on:
   workflow_dispatch:
@@ -7,32 +7,52 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Install host dependencies
+      - name: Install host basic tools
         run: |
           sudo apt update -qq
           sudo apt install -y -qq make wget tar xz-utils file
 
-      - name: Cache prebuilt cross toolchain
+      - name: Cache cross toolchain
         uses: actions/cache@v3
         with:
           path: /opt/cross
-          key: mipsel-linux-musl-prebuilt-v1
+          key: mipsel-musl-prebuilt-v2
 
-      - name: Fetch prebuilt mipsel-linux-musl toolchain
+      - name: Fetch prebuilt toolchain (with retry)
         run: |
-          set -e
           if [ ! -d "/opt/cross/bin" ]; then
-            wget -q https://github.com/osdev0/musl-cross/releases/download/mipsel-linux-musl/mipsel-linux-musl-cross.tar.xz
-            tar -xf mipsel-linux-musl-cross.tar.xz
-            sudo rm -rf /opt/cross
-            sudo mv mipsel-linux-musl-cross /opt/cross
+            echo "Downloading cross toolchain..."
+            for attempt in 1 2; do
+              wget --timeout=30 --tries=2 -q https://github.com/osdev0/musl-cross/releases/download/mipsel-linux-musl/mipsel-linux-musl-cross.tar.xz
+              if [ $? -eq 0 ]; then
+                break
+              fi
+              echo "Retry download..."
+              sleep 6
+            done
+
+            if [ -f "mipsel-linux-musl-cross.tar.xz" ]; then
+              tar -xf mipsel-linux-musl-cross.tar.xz
+              sudo rm -rf /opt/cross
+              sudo mv mipsel-linux-musl-cross /opt/cross
+            else
+              echo "Toolchain download failed, exit."
+              exit 1
+            fi
           fi
+
           echo "/opt/cross/bin" >> $GITHUB_PATH
-          # 校验工具链
+
+          # 轻量强校验：必须找到交叉编译器
+          if ! command -v mipsel-linux-musl-gcc >/dev/null; then
+            echo "ERROR: cross compiler not found!"
+            exit 1
+          fi
+
           mipsel-linux-musl-gcc --version
           mipsel-linux-musl-strip --version
 
-      - name: Checkout source
+      - name: Checkout source & submodules
         uses: actions/checkout@v4
         with:
           submodules: true
@@ -43,15 +63,20 @@ jobs:
           CFLAGS: -static -no-pie -O2
           LDFLAGS: -static -no-pie
         run: |
+          set -e
           make clean
           make pure
+
+          # 打印ELF信息，方便事后核对架构
           file bin/hev-socks5-tproxy
-          # strip容错，失败不阻断流程
+
+          # strip容错，识别不了就跳过
           if mipsel-linux-musl-strip --strip-unneeded bin/hev-socks5-tproxy; then
-            echo "Strip success"
+            echo "Strip OK"
           else
-            echo "Strip skipped, keep full binary"
+            echo "Strip skipped"
           fi
+
           cp bin/hev-socks5-tproxy ./hev-socks5-tproxy-mipsel-musl
 
       - name: Upload artifact
@@ -59,4 +84,3 @@ jobs:
         with:
           name: hev-socks5-tproxy-mipsel-musl
           path: hev-socks5-tproxy-mipsel-musl
-
