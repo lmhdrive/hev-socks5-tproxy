@@ -1,73 +1,62 @@
-name: Build hev-socks5-tproxy for OpenWrt 22.03 mipsel-musl
+name: Build hev-socks5-tproxy (mipsel-musl prebuilt toolchain)
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - name: Install build tools
+      - name: Install host dependencies
         run: |
           sudo apt update -qq
-          sudo apt install -y -qq git make sed wget xz-utils file
+          sudo apt install -y -qq make wget tar xz-utils file
 
-      - name: Cache cross compiler
+      - name: Cache prebuilt cross toolchain
         uses: actions/cache@v3
         with:
           path: /opt/cross
-          key: musl-cross-make-mipsel-illinois-v3
+          key: mipsel-linux-musl-prebuilt-v1
 
-      - name: Build musl-cross-make (US university mirror, softfloat)
+      - name: Fetch prebuilt mipsel-linux-musl toolchain
         run: |
           set -e
           if [ ! -d "/opt/cross/bin" ]; then
-            git clone --depth=1 https://github.com/richfelker/musl-cross-make.git
-            cd musl-cross-make
-            # 替换GNU镜像为伊利诺伊镜像，提升国外下载稳定性
-            sed -i 's|https://ftp.gnu.org/gnu|https://mirrors.illinois.edu/gnu|g' Makefile
-            # 写入配置：mipsel-linux-musl + 软浮点 + 输出目录
-            echo "TARGET=mipsel-linux-musl" > config.mak
-            echo "OUTPUT=/opt/cross" >> config.mak
-            echo "GCC_CONFIG += --with-float=soft" >> config.mak
-            # 关闭PIE，从工具链层面避免PIE ELF导致strip不认
-            echo "CFLAGS += -no-pie" >> config.mak
-            echo "LDFLAGS += -no-pie" >> config.mak
-            make -j$(nproc)
-            sudo make install
+            wget -q https://github.com/osdev0/musl-cross/releases/download/mipsel-linux-musl/mipsel-linux-musl-cross.tar.xz
+            tar -xf mipsel-linux-musl-cross.tar.xz
+            sudo rm -rf /opt/cross
+            sudo mv mipsel-linux-musl-cross /opt/cross
           fi
           echo "/opt/cross/bin" >> $GITHUB_PATH
-          # 验证工具链
+          # 校验工具链
           mipsel-linux-musl-gcc --version
           mipsel-linux-musl-strip --version
 
-      - name: Checkout source with submodules
+      - name: Checkout source
         uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Compile static non-PIE (fix strip recognize error)
+      - name: Compile static non-PIE
         env:
           CROSS_COMPILE: mipsel-linux-musl-
-          # 强制静态链接 + 关闭PIE，生成传统ELF
           CFLAGS: -static -no-pie -O2
           LDFLAGS: -static -no-pie
         run: |
-          set -e
           make clean
           make pure
-          # 先看一下ELF格式，排错用
           file bin/hev-socks5-tproxy
-          # strip加容错：如果识别失败就跳过strip，不阻断CI
+          # strip容错，失败不阻断流程
           if mipsel-linux-musl-strip --strip-unneeded bin/hev-socks5-tproxy; then
-            echo "strip success"
+            echo "Strip success"
           else
-            echo "strip failed, keep original binary"
+            echo "Strip skipped, keep full binary"
           fi
-          cp bin/hev-socks5-tproxy ./hev-socks5-tproxy-mipsel-musl-openwrt2203
+          cp bin/hev-socks5-tproxy ./hev-socks5-tproxy-mipsel-musl
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hev-socks5-tproxy-mipsel-musl-openwrt2203
-          path: hev-socks5-tproxy-mipsel-musl-openwrt2203
+          name: hev-socks5-tproxy-mipsel-musl
+          path: hev-socks5-tproxy-mipsel-musl
+
